@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>訪問記録ボイスレコーダー（最小版）</title>
+</head>
+<body>
+  <h1>訪問記録ボイスレコーダー</h1>
+
+  <button id="startBtn">🎙️ 録音開始</button>
+  <button id="stopBtn" disabled>⏹️ 停止</button>
+  <button id="saveBtn" disabled>💾 保存</button>
+
+  <p id="status">待機中</p>
+  <audio id="audioPlayer" controls></audio>
+
+  <script>
+    let mediaRecorder;
+    let chunks = [];
+
+    const startBtn = document.getElementById("startBtn");
+    const stopBtn = document.getElementById("stopBtn");
+    const saveBtn = document.getElementById("saveBtn");
+    const status = document.getElementById("status");
+    const audioPlayer = document.getElementById("audioPlayer");
+
+    function getSupportedMimeType() {
+      const types = [
+        "audio/mp4",
+        "audio/webm;codecs=opus",
+        "audio/webm"
+      ];
+      for (const t of types) {
+        if (MediaRecorder.isTypeSupported(t)) return t;
+      }
+      return "";
+    }
+
+    startBtn.addEventListener("click", async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const mimeType = getSupportedMimeType();
+        mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
+        chunks = [];
+
+        mediaRecorder.ondataavailable = e => {
+          if (e.data.size > 0) chunks.push(e.data);
+        };
+
+        mediaRecorder.onstop = () => {
+          const blob = new Blob(chunks, { type: mediaRecorder.mimeType });
+          const url = URL.createObjectURL(blob);
+          audioPlayer.src = url;
+          saveBtn.disabled = false;
+          stream.getTracks().forEach(t => t.stop());
+        };
+
+        mediaRecorder.start();
+        status.textContent = "🎙️ 録音中…";
+        startBtn.disabled = true;
+        stopBtn.disabled = false;
+      } catch (err) {
+        alert("マイクを使用できません: " + err);
+      }
+    });
+
+    stopBtn.addEventListener("click", () => {
+      if (mediaRecorder && mediaRecorder.state === "recording") {
+        mediaRecorder.stop();
+        status.textContent = "⏹️ 停止しました";
+        startBtn.disabled = false;
+        stopBtn.disabled = true;
+      }
+    });
+
+    saveBtn.addEventListener("click", () => {
+      const blob = new Blob(chunks, { type: mediaRecorder.mimeType });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `record_${new Date().toISOString().replace(/[:.]/g, "-")}.m4a`;
+      a.click();
+      URL.revokeObjectURL(url);
+      status.textContent = "💾 保存しました";
+    });
+  </script>
+</body>
+</html>
